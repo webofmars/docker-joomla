@@ -1,5 +1,5 @@
-FROM php:7.3-fpm
-LABEL maintainer="Michael Babker <michael.babker@joomla.org> (@mbabker)"
+FROM php:5.4-fpm
+LABEL maintainer="Frederic Leger <frederic@webofmars.com>"
 
 # Disable remote database security requirements.
 ENV JOOMLA_INSTALLATION_DISABLE_LOCALHOST_CHECK=1
@@ -18,6 +18,7 @@ RUN set -ex; \
 		libpng-dev \
 		libpq-dev \
 		libzip-dev \
+		dpkg-dev \
 	; \
 	\
 	docker-php-ext-configure gd --with-png-dir=/usr --with-jpeg-dir=/usr; \
@@ -35,12 +36,12 @@ RUN set -ex; \
 	; \
 	\
 # pecl will claim success even if one install fails, so we need to perform each install separately
-	pecl install APCu-5.1.17; \
-	pecl install memcached-3.1.3; \
+	pecl install APC-3.1.13; \
+	pecl install memcached-2.2.0; \
 	pecl install redis-4.2.0; \
 	\
 	docker-php-ext-enable \
-		apcu \
+		apc \
 		memcached \
 		redis \
 	; \
@@ -66,10 +67,12 @@ ENV JOOMLA_VERSION 3.9.3
 ENV JOOMLA_SHA512 333554c0ce784c540b5a184c728c4d516103fe09fa66316accf537cdfc74ef2632a8972cb8fe665c20798817e454bc5156e1a0b1a6bfc8e70c63e3c4f698dee9
 
 # Download package and extract to web volume
-RUN curl -o joomla.tar.bz2 -SL https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.tar.bz2 \
+RUN apt-get update -yqq && \
+	apt-get install bzip2 && \
+	curl -o joomla.tar.bz2 -SL https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.tar.bz2 \
 	&& echo "$JOOMLA_SHA512 *joomla.tar.bz2" | sha512sum -c - \
 	&& mkdir /usr/src/joomla \
-	&& tar -xf joomla.tar.bz2 -C /usr/src/joomla \
+	&& tar -jxf joomla.tar.bz2 -C /usr/src/joomla \
 	&& rm joomla.tar.bz2 \
 	&& chown -R www-data:www-data /usr/src/joomla
 

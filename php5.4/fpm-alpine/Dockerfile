@@ -1,31 +1,31 @@
-FROM php:7.3-apache
+FROM php:5.4-fpm-alpine
 LABEL maintainer="Michael Babker <michael.babker@joomla.org> (@mbabker)"
 
 # Disable remote database security requirements.
 ENV JOOMLA_INSTALLATION_DISABLE_LOCALHOST_CHECK=1
 
-# Enable Apache Rewrite Module
-RUN a2enmod rewrite
+# entrypoint.sh dependencies
+RUN apk add --no-cache \
+	bash
 
 # Install PHP extensions
 RUN set -ex; \
 	\
-	savedAptMark="$(apt-mark showmanual)"; \
-	\
-	apt-get update; \
-	apt-get install -y --no-install-recommends \
-		libbz2-dev \
-		libjpeg-dev \
-		libldap2-dev \
+	apk add --no-cache --virtual .build-deps \
+		$PHPIZE_DEPS \
+		autoconf \
+		bzip2-dev \
+		libjpeg-turbo-dev \
 		libmemcached-dev \
 		libpng-dev \
-		libpq-dev \
 		libzip-dev \
+		openldap-dev \
+		pcre-dev \
+		postgresql-dev \
 	; \
 	\
 	docker-php-ext-configure gd --with-png-dir=/usr --with-jpeg-dir=/usr; \
-	debMultiarch="$(dpkg-architecture --query DEB_BUILD_MULTIARCH)"; \
-	docker-php-ext-configure ldap --with-libdir="lib/$debMultiarch"; \
+	docker-php-ext-configure ldap; \
 	docker-php-ext-install \
 		bz2 \
 		gd \
@@ -38,33 +38,28 @@ RUN set -ex; \
 	; \
 	\
 # pecl will claim success even if one install fails, so we need to perform each install separately
-	pecl install APCu-5.1.17; \
+	pecl install APC-3.1.13; \
 	pecl install memcached-3.1.3; \
 	pecl install redis-4.2.0; \
 	\
 	docker-php-ext-enable \
-		apcu \
+		apc \
 		memcached \
 		redis \
 	; \
 	\
-# reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
-	apt-mark auto '.*' > /dev/null; \
-	apt-mark manual $savedAptMark; \
-	ldd "$(php -r 'echo ini_get("extension_dir");')"/*.so \
-		| awk '/=>/ { print $3 }' \
+	runDeps="$( \
+		scanelf --needed --nobanner --format '%n#p' --recursive /usr/local/lib/php/extensions \
+		| tr ',' '\n' \
 		| sort -u \
-		| xargs -r dpkg-query -S \
-		| cut -d: -f1 \
-		| sort -u \
-		| xargs -rt apt-mark manual; \
-	\
-	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
-	rm -rf /var/lib/apt/lists/*
+		| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
+		)"; \
+	apk add --virtual .joomla-phpext-rundeps $runDeps; \
+	apk del .build-deps
 
 VOLUME /var/www/html
 
-# Define Joomla version and expected SHA512 signature
+# Define Joomla version and expected SHA1 signature
 ENV JOOMLA_VERSION 3.9.3
 ENV JOOMLA_SHA512 333554c0ce784c540b5a184c728c4d516103fe09fa66316accf537cdfc74ef2632a8972cb8fe665c20798817e454bc5156e1a0b1a6bfc8e70c63e3c4f698dee9
 
@@ -81,4 +76,4 @@ COPY docker-entrypoint.sh /entrypoint.sh
 COPY makedb.php /makedb.php
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["apache2-foreground"]
+CMD ["php-fpm"]
