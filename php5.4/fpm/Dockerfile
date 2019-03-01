@@ -29,6 +29,7 @@ RUN set -ex; \
 		gd \
 		ldap \
 		mysqli \
+		mbstring \
 		pdo_mysql \
 		pdo_pgsql \
 		pgsql \
@@ -43,6 +44,7 @@ RUN set -ex; \
 	docker-php-ext-enable \
 		apc \
 		memcached \
+		mbstring \
 		redis \
 	; \
 	\
