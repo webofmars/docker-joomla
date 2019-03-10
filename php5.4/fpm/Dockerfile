@@ -78,6 +78,14 @@ RUN apt-get update -yqq && \
 	&& rm joomla.tar.bz2 \
 	&& chown -R www-data:www-data /usr/src/joomla
 
+# install proftpd needed by joomla
+ADD --chown=root:root joomla-ftp.conf /etc/proftpd/conf.d/joomla.conf
+ADD --chown=root:root ftpasswd /usr/src/joomla/.ftpasswd
+RUN echo "proftpd-basic shared/proftpd/inetd_or_standalone select standalone" \
+	| debconf-set-selections && \
+	chmod 600 /usr/src/joomla/.ftpasswd && \
+	apt-get install -y proftpd
+
 # Copy init scripts and custom .htaccess
 COPY docker-entrypoint.sh /entrypoint.sh
 COPY makedb.php /makedb.php
