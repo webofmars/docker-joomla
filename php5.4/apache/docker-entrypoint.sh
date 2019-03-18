@@ -67,4 +67,10 @@ if [[ "$1" == apache2* ]] || [ "$1" == php-fpm ]; then
         echo >&2 "========================================================================"
 fi
 
+# insure that the ftpasswd has correct perms
+# this is needed because it's located inside a docker volume and copied with bad perms
+# at volume init
+chmod 600 /var/www/html/.ftpasswd
+
+service proftpd start
 exec "$@"

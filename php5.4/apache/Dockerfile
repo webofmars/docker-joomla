@@ -21,6 +21,7 @@ RUN set -ex; \
 		libpng-dev \
 		libpq-dev \
 		libzip-dev \
+		dpkg-dev \
 	; \
 	\
 	docker-php-ext-configure gd --with-png-dir=/usr --with-jpeg-dir=/usr; \
@@ -30,6 +31,7 @@ RUN set -ex; \
 		bz2 \
 		gd \
 		ldap \
+		mysql \
 		mysqli \
 		mbstring \
 		pdo_mysql \
@@ -40,11 +42,11 @@ RUN set -ex; \
 	\
 # pecl will claim success even if one install fails, so we need to perform each install separately
 	pecl install APC-3.1.13; \
-	pecl install memcached-3.1.3; \
+	pecl install memcached-2.2.0; \
 	pecl install redis-4.2.0; \
 	\
 	docker-php-ext-enable \
-		apcu \
+		apc \
 		memcached \
 		mbstring \
 		redis \
@@ -71,12 +73,28 @@ ENV JOOMLA_VERSION 3.9.3
 ENV JOOMLA_SHA512 333554c0ce784c540b5a184c728c4d516103fe09fa66316accf537cdfc74ef2632a8972cb8fe665c20798817e454bc5156e1a0b1a6bfc8e70c63e3c4f698dee9
 
 # Download package and extract to web volume
-RUN curl -o joomla.tar.bz2 -SL https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.tar.bz2 \
+RUN apt-get update -yqq && \
+	apt-get install bzip2 && \
+	curl -o joomla.tar.bz2 -SL https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.tar.bz2 \
 	&& echo "$JOOMLA_SHA512 *joomla.tar.bz2" | sha512sum -c - \
 	&& mkdir /usr/src/joomla \
-	&& tar -xf joomla.tar.bz2 -C /usr/src/joomla \
+	&& tar -jxf joomla.tar.bz2 -C /usr/src/joomla \
 	&& rm joomla.tar.bz2 \
 	&& chown -R www-data:www-data /usr/src/joomla
+
+# install proftpd needed by joomla
+ADD --chown=root:root joomla-ftp.conf /etc/proftpd/conf.d/joomla.conf
+
+RUN echo "proftpd-basic shared/proftpd/inetd_or_standalone select standalone" \
+	| debconf-set-selections && \
+	mkdir /var/www/html/app && \
+	chown -R www-data:www-data /var/www/html && \
+	apt-get install -y proftpd
+
+# should be overritden by the app
+ADD --chown=root:root ftpasswd.dist /var/www/html/.ftpasswd
+RUN chmod 600 /var/www/html/.ftpasswd && \
+	ls -l /var/www/html/.ftpasswd
 
 # Copy init scripts and custom .htaccess
 COPY docker-entrypoint.sh /entrypoint.sh
