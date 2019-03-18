@@ -28,6 +28,7 @@ RUN set -ex; \
 		bz2 \
 		gd \
 		ldap \
+		mysql \
 		mysqli \
 		mbstring \
 		pdo_mysql \
